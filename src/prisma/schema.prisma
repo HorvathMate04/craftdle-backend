@@ -1,0 +1,277 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model achievements {
+  id                 Int                  @id @default(autoincrement())
+  title              String               @db.VarChar(255)
+  description        String               @db.VarChar(255)
+  icon               String               @db.VarChar(255)
+  goal               Int
+  is_secret          Boolean
+  parent             Int?
+  event              String?              @db.VarChar(255)
+  target             String?              @db.VarChar(255)
+  achievements       achievements?        @relation("achievementsToachievements", fields: [parent], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "achievements_ibfk_1")
+  other_achievements achievements[]       @relation("achievementsToachievements")
+  rewards            rewards[]
+  users_achievements users_achievements[]
+
+  @@index([parent], map: "parent")
+}
+
+model admin_rights {
+  admin        Int     @unique(map: "admin")
+  is_super     Boolean
+  delete_users Boolean
+  id           Int     @id @default(autoincrement())
+  users        users   @relation(fields: [admin], references: [id], onUpdate: Restrict, map: "admin_rights_ibfk_1")
+}
+
+model collections {
+  id      Int    @id @default(autoincrement())
+  item_id String @unique(map: "item_id") @db.VarChar(255)
+  name    String @db.VarChar(255)
+  src     String @db.VarChar(255)
+  tips    tips[]
+}
+
+model controls {
+  id                                   Int              @id @default(autoincrement())
+  settings                             Int              @unique(map: "settings")
+  is_tap_mode                          Boolean          @default(false)
+  copy                                 String           @default("LMB") @db.VarChar(3)
+  remove                               String           @default("RMB") @db.VarChar(3)
+  settings_controls_settingsTosettings settings         @relation("controls_settingsTosettings", fields: [settings], references: [id], onUpdate: Restrict, map: "controls_ibfk_1")
+  table_mappings                       table_mappings[]
+}
+
+model crafting_table_slots {
+  tip         Int
+  position    Int
+  content     String      @db.VarChar(255)
+  status      Int
+  id          Int         @id @default(autoincrement())
+  tips        tips        @relation(fields: [tip], references: [id], onUpdate: Restrict, map: "crafting_table_slots_ibfk_1")
+  guess_types guess_types @relation(fields: [status], references: [id], onUpdate: Restrict, map: "crafting_table_slots_ibfk_2")
+
+  @@index([status], map: "status")
+  @@index([tip], map: "tip")
+}
+
+model difficulties {
+  id         Int         @id @default(autoincrement())
+  name       String      @unique(map: "name") @db.VarChar(255)
+  color_code String      @unique(map: "color_code") @db.VarChar(6)
+  gamemodes  gamemodes[]
+}
+
+model gamemodes {
+  id           Int          @id @default(autoincrement())
+  icon         String       @db.VarChar(255)
+  name         String       @unique(map: "name") @db.VarChar(255)
+  description  String       @db.VarChar(255)
+  difficulty   Int
+  difficulties difficulties @relation(fields: [difficulty], references: [id], onUpdate: Restrict, map: "gamemodes_ibfk_1")
+  games        games[]
+
+  @@index([difficulty], map: "difficulty")
+}
+
+model games {
+  id                Int                 @id @default(autoincrement())
+  type              Int
+  player            Int
+  riddle            String              @db.VarChar(255)
+  date              DateTime            @db.DateTime(0)
+  is_solved         Boolean
+  gamemodes         gamemodes           @relation(fields: [type], references: [id], onUpdate: Restrict, map: "games_ibfk_1")
+  users             users               @relation(fields: [player], references: [id], onUpdate: Restrict, map: "games_ibfk_2")
+  hints             hints[]
+  inventories_items inventories_items[]
+  tips              tips[]
+
+  @@index([player], map: "player")
+  @@index([type], map: "type")
+}
+
+model guess_types {
+  id                   Int                    @id @default(autoincrement())
+  type                 String                 @unique(map: "type") @db.VarChar(255)
+  crafting_table_slots crafting_table_slots[]
+}
+
+model hints {
+  game    Int
+  number  Int
+  content String? @db.VarChar(255)
+  id      Int     @id @default(autoincrement())
+  games   games   @relation(fields: [game], references: [id], onUpdate: Restrict, map: "hints_ibfk_1")
+
+  @@index([game], map: "game")
+}
+
+model inventories_items {
+  game  Int
+  item  Int
+  id    Int   @id @default(autoincrement())
+  games games @relation(fields: [game], references: [id], onUpdate: Restrict, map: "inventories_items_ibfk_1")
+  items items @relation(fields: [item], references: [id], onUpdate: Restrict, map: "inventories_items_ibfk_2")
+
+  @@index([game], map: "game")
+  @@index([item], map: "item")
+}
+
+model items {
+  id                Int                 @id @default(autoincrement())
+  item_id           String              @unique(map: "item_id") @db.VarChar(255)
+  name              String              @db.VarChar(255)
+  src               String              @db.VarChar(255)
+  inventories_items inventories_items[]
+}
+
+model maintenance {
+  id    Int      @id @default(autoincrement())
+  user  Int
+  start DateTime @db.DateTime(0)
+  end   DateTime @db.DateTime(0)
+  users users    @relation(fields: [user], references: [id], onUpdate: Restrict, map: "maintenance_ibfk_1")
+
+  @@index([user], map: "user")
+}
+
+model profile_borders {
+  id   Int    @id @default(autoincrement())
+  name String @db.VarChar(255)
+  src  String @db.VarChar(255)
+}
+
+model profile_pictures {
+  id   Int    @id @default(autoincrement())
+  name String @db.VarChar(255)
+  src  String @db.VarChar(255)
+}
+
+model reward_types {
+  id      Int       @id @default(autoincrement())
+  name    String    @db.VarChar(255)
+  rewards rewards[]
+}
+
+model rewards {
+  achievement  Int
+  reward       Int
+  reward_type  Int
+  id           Int          @id @default(autoincrement())
+  achievements achievements @relation(fields: [achievement], references: [id], onUpdate: Restrict, map: "rewards_ibfk_1")
+  reward_types reward_types @relation(fields: [reward_type], references: [id], onUpdate: Restrict, map: "rewards_ibfk_2")
+
+  @@index([achievement], map: "achievement")
+  @@index([reward_type], map: "reward_type")
+}
+
+model settings {
+  id                                   Int       @id @default(autoincrement())
+  user                                 Int
+  volume                               Int       @default(50)
+  image_size                           Int       @default(50)
+  is_set                               Boolean
+  controls_controls_settingsTosettings controls? @relation("controls_settingsTosettings")
+  users                                users     @relation(fields: [user], references: [id], onUpdate: Restrict, map: "settings_ibfk_1")
+
+  @@index([user], map: "user")
+}
+
+model table_mappings {
+  id       Int      @id @default(autoincrement())
+  control  Int
+  slot     Int
+  hot_key  String?  @db.VarChar(1)
+  controls controls @relation(fields: [control], references: [id], onUpdate: Restrict, map: "table_mappings_ibfk_1")
+
+  @@index([control], map: "control")
+}
+
+model tips {
+  id                   Int                    @id @default(autoincrement())
+  game                 Int
+  date                 DateTime               @db.DateTime(0)
+  item                 String                 @db.VarChar(255)
+  crafting_table_slots crafting_table_slots[]
+  games                games                  @relation(fields: [game], references: [id], onUpdate: Restrict, map: "tips_ibfk_1")
+  collections          collections            @relation(fields: [item], references: [item_id], onUpdate: Restrict, map: "tips_ibfk_2")
+
+  @@index([game], map: "game")
+  @@index([item], map: "tips_ibfk_2")
+}
+
+model tokens {
+  user        Int     @unique(map: "user")
+  login_token String  @unique(map: "login_token") @db.VarChar(255)
+  is_expire   Boolean
+  id          Int     @id @default(autoincrement())
+  users       users   @relation(fields: [user], references: [id], onUpdate: Restrict, map: "tokens_ibfk_1")
+}
+
+model users {
+  id                 Int                  @id @default(autoincrement())
+  username           String?              @unique(map: "username") @db.VarChar(16)
+  password           String?              @db.VarChar(255)
+  email              String?              @unique(map: "email") @db.VarChar(255)
+  registration_date  DateTime             @db.DateTime(0)
+  is_guest           Boolean
+  socket_id          String?              @db.VarChar(255)
+  admin_rights       admin_rights?
+  games              games[]
+  maintenance        maintenance[]
+  settings           settings[]
+  tokens             tokens?
+  users_achievements users_achievements[]
+}
+
+model users_achievements {
+  user         Int
+  achievement  Int
+  progress     Int
+  id           Int          @id @default(autoincrement())
+  achievements achievements @relation(fields: [achievement], references: [id], onUpdate: Restrict, map: "users_achievements_ibfk_1")
+  users        users        @relation(fields: [user], references: [id], onUpdate: Restrict, map: "users_achievements_ibfk_2")
+
+  @@unique([user, achievement])
+  @@index([achievement], map: "achievement")
+  @@index([user], map: "user")
+}
+
+model users_collections {
+  user       Int
+  collection Int
+  id         Int @id @default(autoincrement())
+
+  @@index([collection], map: "collection")
+  @@index([user], map: "user")
+}
+
+model users_profile_borders {
+  user           Int
+  profile_border Int
+  is_set         Boolean
+  id             Int     @id @default(autoincrement())
+
+  @@index([profile_border], map: "profile_border")
+  @@index([user], map: "user")
+}
+
+model users_profile_pictures {
+  user            Int
+  profile_picture Int
+  is_set          Boolean
+  id              Int     @id @default(autoincrement())
+
+  @@index([profile_picture], map: "profile_picture")
+  @@index([user], map: "user")
+}
