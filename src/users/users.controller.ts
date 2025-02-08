@@ -7,13 +7,15 @@ import { UpdateSettingsDto } from './dtos/settingsData.dto';
 import { ProfileDto } from './dtos/profileAssetsData.dto';
 import { EmailService } from 'src/email/email.service';
 import { EmailGateway } from 'src/email/email.gateway';
+import { SettingsService } from 'src/settings/settings.service';
 
 @Controller('users')
 export class UsersController {
     constructor(
         private readonly usersService: UsersService,
         private readonly emailService: EmailService,
-        private readonly emailGateway: EmailGateway
+        private readonly emailGateway: EmailGateway,
+        private readonly settingsService: SettingsService
     ) { }
 
     //######################################################### USER LOGIN/REGIST ENDPOINTS #########################################################
@@ -100,7 +102,7 @@ export class UsersController {
     @Get('settings')
     async getSettings(@Headers('authorization') authorization: string): Promise<ApiResponse> {
         try {
-            const result = await this.usersService.collectSettings(authorization);
+            const result = await this.settingsService.collectSettings(authorization);
             return { data: result }; 
         } catch (err) {
             return { message: err.message };
@@ -118,7 +120,7 @@ export class UsersController {
     @Put('settings/:id')
     async updateSettings(@Param('id') settingsId: number, @Headers('authorization') authorization: string, @Body() updateSettingsData: UpdateSettingsDto) {
         try {
-            await this.usersService.updateSettings(settingsId, authorization, updateSettingsData);
+            await this.settingsService.modifySettings(settingsId, authorization, updateSettingsData);
             return { message: "Settings successfully changed" }
         } catch (err) {
             return { message: err.message }

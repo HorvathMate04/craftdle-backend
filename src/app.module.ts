@@ -14,9 +14,10 @@ import { CacheModule } from './cache/cache.module';
 import { AssetsModule } from './assets/assets.module';
 import { AdminModule } from './admin/admin.module';
 import { AchievementsModule } from './achievements/achievements.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
-  imports: [UsersModule, SocketModule, PrismaModule, GameModule, RiddlesModule, TipsModule, RecipesModule, TokenModule, EmailModule, CacheModule, AssetsModule, AdminModule, AchievementsModule],
+  imports: [UsersModule, SocketModule, PrismaModule, GameModule, RiddlesModule, TipsModule, RecipesModule, TokenModule, EmailModule, CacheModule, AssetsModule, AdminModule, AchievementsModule, SettingsModule],
   controllers: [AppController],
   providers: [AppService],
 })

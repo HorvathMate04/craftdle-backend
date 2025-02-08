@@ -1,7 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { CacheService } from './cache.service';
+import { PrismaModule } from 'src/prisma/prisma.module';
 
+@Global()
 @Module({
-  providers: [CacheService]
+    imports: [PrismaModule],
+    providers: [CacheService],
+    exports: [CacheService],
 })
-export class CacheModule {}
+export class CacheModule { }

@@ -1,4 +1,4 @@
-import { IControls } from "./IControls"
+import { IControls } from "../../users/interfaces/IControls"
 
 export interface ISettings {
     id: number,
