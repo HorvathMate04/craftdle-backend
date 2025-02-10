@@ -1,13 +1,14 @@
 import { Controller, Get, Post, Put, Delete, Body, UnauthorizedException, Param, Headers, HttpException, HttpStatus, Render, Query } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { ApiResponse } from '../shared/interfaces/APIResponse';
-import { LoginDataDto } from './dtos/loginData.dto';
-import { RegistDataDto } from './dtos/registData.dto';
+import { LoginDataDto } from './dtos/login.dto';
+import { RegistDataDto } from './dtos/regist.dto';
 import { UpdateSettingsDto } from './dtos/settingsData.dto';
-import { ProfileDto } from './dtos/profileAssetsData.dto';
+import { ProfileDto } from './dtos/profileAssets.dto';
 import { EmailService } from 'src/email/email.service';
 import { EmailGateway } from 'src/email/email.gateway';
 import { SettingsService } from 'src/settings/settings.service';
+import { AssetsService } from 'src/assets/assets.service';
 
 @Controller('users')
 export class UsersController {
@@ -15,7 +16,8 @@ export class UsersController {
         private readonly usersService: UsersService,
         private readonly emailService: EmailService,
         private readonly emailGateway: EmailGateway,
-        private readonly settingsService: SettingsService
+        private readonly settingsService: SettingsService,
+        private readonly assetsService: AssetsService
     ) { }
 
     //######################################################### USER LOGIN/REGIST ENDPOINTS #########################################################
@@ -92,7 +94,7 @@ export class UsersController {
         }
     }
 
-    //######################################################### SETTINGS ENDPOINTS #########################################################
+    //######################################################### USER'S SETTINGS ENDPOINTS #########################################################
 
     /**
      * Felhasználó beállításainak lekérdezése (settings).
@@ -127,6 +129,9 @@ export class UsersController {
         }
     }
 
+
+    //######################################################### USER'S ASSETS ENDPOINTS #########################################################
+
     /**
      * A felhasználó gyűjteményének lekérdezése.
      * @param authorization - A Bearer token azonosításhoz.
@@ -135,7 +140,7 @@ export class UsersController {
     @Get('collection')
     async getCollection(@Headers('authorization') authorization: string): Promise<ApiResponse> {
         try {
-            const result = await this.usersService.getCollection(authorization);
+            const result = await this.assetsService.getCollection(authorization);
             return { data: result };
         } catch (err) {
             return { message: err.message };
@@ -151,7 +156,7 @@ export class UsersController {
     @Put('profile')
     async updateProfile(@Headers('authorization') authorization: string, @Body() body: ProfileDto): Promise<ApiResponse> {
         try {
-            const result = await this.usersService.updateProfile(authorization, body);
+            const result = await this.assetsService.updateProfile(authorization, body);
             return { data: result };
         } catch (err) {
             return { message: err.message };
@@ -166,12 +171,14 @@ export class UsersController {
     @Get('stats')
     async getStats(@Headers('authorization') authorization: string): Promise<ApiResponse> {
         try {
-            const result = await this.usersService.getStats(authorization)
+            const result = await this.assetsService.getStats(authorization)
             return { data: result }
         } catch (err) {
             return { message: err.message }
         }
     }
+
+    //######################################################### PASSWORD RESET ENDPOINTS #########################################################
 
     /**
      * Jelszó visszaállító kérés küldése a felhasználónak emailben.

@@ -34,12 +34,11 @@ model admin_rights {
 }
 
 model collections {
-  id                Int                 @id @default(autoincrement())
-  item_id           String              @unique(map: "item_id") @db.VarChar(255)
-  name              String              @db.VarChar(255)
-  src               String              @db.VarChar(255)
-  tips              tips[]
-  users_collections users_collections[]
+  id      Int    @id @default(autoincrement())
+  item_id String @unique(map: "item_id") @db.VarChar(255)
+  name    String @db.VarChar(255)
+  src     String @db.VarChar(255)
+  tips    tips[]
 }
 
 model controls {
@@ -147,17 +146,15 @@ model maintenance {
 }
 
 model profile_borders {
-  id                    Int                     @id @default(autoincrement())
-  name                  String                  @db.VarChar(255)
-  src                   String                  @db.VarChar(255)
-  users_profile_borders users_profile_borders[]
+  id   Int    @id @default(autoincrement())
+  name String @db.VarChar(255)
+  src  String @db.VarChar(255)
 }
 
 model profile_pictures {
-  id                     Int                      @id @default(autoincrement())
-  name                   String                   @db.VarChar(255)
-  src                    String                   @db.VarChar(255)
-  users_profile_pictures users_profile_pictures[]
+  id   Int    @id @default(autoincrement())
+  name String @db.VarChar(255)
+  src  String @db.VarChar(255)
 }
 
 model reward_types {
@@ -222,22 +219,19 @@ model tokens {
 }
 
 model users {
-  id                     Int                      @id @default(autoincrement())
-  username               String?                  @unique(map: "username") @db.VarChar(16)
-  password               String?                  @db.VarChar(255)
-  email                  String?                  @unique(map: "email") @db.VarChar(255)
-  registration_date      DateTime                 @db.DateTime(0)
-  is_guest               Boolean
-  socket_id              String?                  @db.VarChar(255)
-  admin_rights           admin_rights?
-  games                  games[]
-  maintenance            maintenance[]
-  settings               settings[]
-  tokens                 tokens?
-  users_achievements     users_achievements[]
-  users_collections      users_collections[]
-  users_profile_borders  users_profile_borders[]
-  users_profile_pictures users_profile_pictures[]
+  id                 Int                  @id @default(autoincrement())
+  username           String?              @unique(map: "username") @db.VarChar(16)
+  password           String?              @db.VarChar(255)
+  email              String?              @unique(map: "email") @db.VarChar(255)
+  registration_date  DateTime             @db.DateTime(0)
+  is_guest           Boolean
+  socket_id          String?              @db.VarChar(255)
+  admin_rights       admin_rights?
+  games              games[]
+  maintenance        maintenance[]
+  settings           settings[]
+  tokens             tokens?
+  users_achievements users_achievements[]
 }
 
 model users_achievements {
@@ -254,35 +248,29 @@ model users_achievements {
 }
 
 model users_collections {
-  user        Int
-  collection  Int
-  id          Int         @id @default(autoincrement())
-  users       users       @relation(fields: [user], references: [id], onUpdate: Restrict, map: "users_collections_ibfk_1")
-  collections collections @relation(fields: [collection], references: [id], onUpdate: Restrict, map: "users_collections_ibfk_2")
+  user       Int
+  collection Int
+  id         Int @id @default(autoincrement())
 
   @@index([collection], map: "collection")
   @@index([user], map: "user")
 }
 
 model users_profile_borders {
-  user            Int
-  profile_border  Int
-  is_set          Boolean
-  id              Int             @id @default(autoincrement())
-  users           users           @relation(fields: [user], references: [id], onUpdate: Restrict, map: "users_profile_borders_ibfk_1")
-  profile_borders profile_borders @relation(fields: [profile_border], references: [id], onUpdate: Restrict, map: "users_profile_borders_ibfk_2")
+  user           Int
+  profile_border Int
+  is_set         Boolean
+  id             Int     @id @default(autoincrement())
 
   @@index([profile_border], map: "profile_border")
   @@index([user], map: "user")
 }
 
 model users_profile_pictures {
-  user             Int
-  profile_picture  Int
-  is_set           Boolean
-  id               Int              @id @default(autoincrement())
-  users            users            @relation(fields: [user], references: [id], onUpdate: Restrict, map: "users_profile_pictures_ibfk_1")
-  profile_pictures profile_pictures @relation(fields: [profile_picture], references: [id], onUpdate: Restrict, map: "users_profile_pictures_ibfk_2")
+  user            Int
+  profile_picture Int
+  is_set          Boolean
+  id              Int     @id @default(autoincrement())
 
   @@index([profile_picture], map: "profile_picture")
   @@index([user], map: "user")

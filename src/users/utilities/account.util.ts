@@ -1,5 +1,5 @@
 import { PrismaService } from '../../prisma/prisma.service';
-import { IUser } from '../interfaces/IUserData';
+import { IUser } from '../interfaces/user.interface';
 import { createToken } from '../../shared/utilities/tokenCreation';
 import * as bcrypt from 'bcrypt';
 import { getCurrentDate } from 'src/shared/utilities/CurrentDate';

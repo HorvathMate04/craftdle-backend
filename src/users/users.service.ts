@@ -8,12 +8,12 @@ import { createToken } from 'src/shared/utilities/tokenCreation';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 // *** DTO-k ***
-import { LoginDataDto } from './dtos/loginData.dto';
-import { RegistDataDto } from './dtos/registData.dto';
+import { LoginDataDto } from './dtos/login.dto';
+import { RegistDataDto } from './dtos/regist.dto';
 import { UpdateSettingsDto } from './dtos/settingsData.dto';
 
 // *** Interfészek és osztályok ***
-import { IUser, IUserData } from './interfaces/IUserData';
+import { IUser, IUserData } from './interfaces/user.interface';
 import { ISettings } from '../settings/interfaces/ISettings';
 import { User } from './models/user.class';
 
@@ -26,7 +26,7 @@ import { createDefaultSettings } from './utilities/DefaultSettingsCreation';
 import { modifySettings } from './utilities/SettingsModification';
 import { geatherSettings } from './utilities/SettingsCollection';
 import { AssetsService } from 'src/assets/assets.service';
-import { ProfileDto } from './dtos/profileAssetsData.dto';
+import { ProfileDto } from './dtos/profileAssets.dto';
 import { GameService } from 'src/game/game.service';
 import { RandomizePasswordResetImages } from './utilities/RandomizePasswordResetImages';
 import { getCurrentDate } from 'src/shared/utilities/CurrentDate';
@@ -336,6 +336,27 @@ export class UsersService {
         } catch (error) {
             return { message: error.message };
         }
+    }
+
+    async RandomizePasswordResetImages(){
+        const images = await this.prisma.collections.findMany();
+        const randomImagesSrc = new Set()
+        const randomIndexes = [];
+        while (randomImagesSrc.size < 3) {
+            const randomIndex = Math.floor(Math.random() * images.length);
+            if(!randomImagesSrc.has(images[randomIndex].src)){
+                randomImagesSrc.add(images[randomIndex].src);
+                randomIndexes.push(randomIndex);
+            };
+        }
+        const correctIndex = Math.floor(Math.random() * 3);
+        return randomIndexes.map((index, i) => ({
+            id: images[index].id,
+            item_id: images[index].item_id,
+            name: images[index].name,
+            src: images[index].src,
+            isRight: i === correctIndex,
+        }));
     }
 
     /**
