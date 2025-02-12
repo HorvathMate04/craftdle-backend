@@ -3,13 +3,17 @@ import * as NodeCache from 'node-cache';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Recipe } from 'src/game/classes/Recipe';
+import { Recipe } from 'src/recipes/classes/recipe.class';
+import { RecipesService } from 'src/recipes/recipes.service';
 
 @Injectable()
 export class CacheService implements OnModuleInit {
     private cache = new NodeCache();
 
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly recipesService: RecipesService,
+    ) { }
 
     async onModuleInit() {
         const recipesFilePath = path.join(__dirname, '../../../recipes.json');
@@ -41,7 +45,7 @@ export class CacheService implements OnModuleInit {
         Object.keys(data).forEach(group => {
             let recipes = [];
             data[group].forEach(recipeData => {
-                recipes.push(new Recipe(recipeData))
+                recipes.push(new Recipe(recipeData, this.recipesService))
             })
             convertedData[group] = recipes;
         });

@@ -1,28 +1,45 @@
-import { SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
-import { Server } from 'socket.io';
-import { Socket } from 'socket.io';
+import { Server, Socket } from 'socket.io';
+import { WebSocketGateway, SubscribeMessage } from '@nestjs/websockets';
+import { AchievementsGateway } from 'src/achievements/achievements.gateway';
+import { AchievementsService } from 'src/achievements/achievements.service';
+import { CacheService } from 'src/cache/cache.service';
+import { Riddle } from 'src/riddles/classes/riddle.class';
+import { UsersService } from 'src/users/users.service';
+import { Game } from './classes/game.class';
+import { RecipesService } from 'src/recipes/recipes.service';
+import { GameService } from './game.service';
+import { SocketGateway } from 'src/socket/socket.gateway';
+import { ITip } from 'src/tip/interfaces/tip.interface';
+import { createMatrixFromArray } from 'src/sharedComponents/utilities/array.util';
+import { TipService } from 'src/tip/tip.service';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { AssetsService } from 'src/assets/assets.service';
 
 @WebSocketGateway({ cors: true })
 export class GameGateway {
 
   private server: Server;
 
-    constructor(
-      private readonly usersService: UsersService,
-      private readonly cacheService: CacheService,
-      private readonly achievementManager: AchievementManager,
-      private readonly achievementGateway: AchievementsGateway,
-    ) { }
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly cacheService: CacheService,
+    private readonly recipesService: RecipesService,
+    private readonly gameService: GameService,
+    private readonly tipService: TipService,
+    private readonly achievementsService: AchievementsService,
+    private readonly achievementGateway: AchievementsGateway,
+    private readonly prisma: PrismaService,
+    private readonly assetsService: AssetsService
+  ) { }
 
   afterInit(server: Server) {
     this.server = server;
   }
 
-  // Egyedi események kezelése
   @SubscribeMessage('startGame')
   async handleNewGame(client: Socket, payload: { newGame: boolean, gamemode: number }) {
-    const riddle = new Riddle(this.cacheService, this.gameService);
-    const game = new Game(riddle, client.id, this.usersService);
+    const riddle = new Riddle(this.cacheService, this.gameService, this.recipesService);
+    const game = new Game(riddle, this.usersService.getUserBySocketId(client.id));
     if (payload.newGame) {
       riddle.initializeNewGame(payload.gamemode);
       game.id = await this.gameService.saveGame(game);
@@ -37,18 +54,14 @@ export class GameGateway {
   @SubscribeMessage('guess')
   async handleGuess(client: Socket, payload: ITip) {
     const game = SocketGateway.gameToClient.get(client.id);
-    console.log("csecs")
     if (game && !game.riddle.guessedRecipes.includes(payload.item.id)) {
-      console.log("csecsek")
       const tippedMatrix = createMatrixFromArray(payload.table);
-      const baseRecipe = RecipeFunctions.getRecipeById(payload.item.group, payload.item.id, this.cacheService);
-      if ((game.riddle.gamemode == 1 && this.gameService.checkTutorialScript(payload.item.group, game.riddle.numberOfGuesses)) || game.riddle.gamemode != 1) {
-        console.log("csecses")
-        if (RecipeFunctions.validateRecipe(tippedMatrix, baseRecipe)) {
-          console.log("csecsnek")
+      const baseRecipe = this.recipesService.getRecipeById(payload.item.group, payload.item.id, this.cacheService);
+      if ((game.riddle.gamemode == 1 && this.tipService.checkTutorialScript(payload.item.group, game.riddle.numberOfGuesses)) || game.riddle.gamemode != 1) {
+        if (this.recipesService.validateRecipe(tippedMatrix, baseRecipe)) {
           game.riddle.guessedRecipes.push(payload.item.id);
           game.riddle.numberOfGuesses++;
-          const result = RecipeFunctions.compareTipWithRiddle(tippedMatrix, game.riddle);
+          const result = this.recipesService.compareTipWithRiddle(tippedMatrix, game.riddle);
           const tip = {
             item: {
               id: baseRecipe.id,
@@ -74,9 +87,9 @@ export class GameGateway {
               name: 'solve',
               targets: [gamemode.name]
             });
-            const achievements = await this.achievementManager.achievementEventListener(game.user.id, events, game, payload);
+            const achievements = await this.achievementsService.achievementEventListener(game.user.id, events, game, payload);
             this.achievementGateway.emitAchievements(client.id, achievements);
-            this.usersService.addItemToCollection(game.user.id, game.riddle.tips[game.riddle.tips.length - 1].item, client.id);
+            this.assetsService.addItemToCollection(game.user.id, game.riddle.tips[game.riddle.tips.length - 1].item, client.id);
           }
           client.emit('guess', game.riddle.toJSON());
           if (result.solved) {

@@ -1,12 +1,19 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TokenService } from 'src/token/token.service';
+import { ProfileAssetsDataDto } from './dtos/profileAssets.dto';
+import { IItem } from 'src/sharedComponents/interfaces/item.interface';
+import { AchievementsService } from 'src/achievements/achievements.service';
+import { AchievementsGateway } from 'src/achievements/achievements.gateway';
+import { getUserById } from 'src/users/utilities/user.util';
 
 @Injectable()
 export class AssetsService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly tokenService: TokenService,
+        private readonly achievementsService: AchievementsService,
+        private readonly achievementsGateway: AchievementsGateway
     ) { }
 
     //######################################################### BASIC FUNCTIONS #########################################################
@@ -45,41 +52,10 @@ export class AssetsService {
 
     //######################################################### USER SPECIFIC FUNCTIONS #########################################################
 
-    /**
-     * Lekéri a felhasználó statisztikáit.
-     * @param authHeader - Az autorizációs fejléc, amely tartalmazza a Bearer tokent.
-     * @returns A felhasználó statisztikái.
-     * @throws HttpException - Ha hiba történik az adatlekérdezés során.
-     */
-    async getStats(authHeader: string) {
-        try {
-            const user = (await this.tokenService.validateBearerToken(authHeader, this.prisma));
-            const stats = {
-                username: user.username,
-                profilePicture: (await this.getUsersProfilePicture(user.id)).find(picture => picture.is_set).profile_pictures,
-                profileBorder: (await this.getUsersProfileBorders(user.id)).find(border => border.is_set).profile_borders,
-                streak: await this.gameService.getStreak(user.id),
-                gamemodes: await this.gameService.sortGames(user.id),
-                registrationDate: user.registration_date.toLocaleDateString(),
-                performedAchievements: {
-                    collected: (await this.getUsersAchievements(user.id)).filter(achievement => achievement.progress === achievement.achievements.goal).length,
-                    collectable: (await this.getAllAchievements()).length
-                },
-                collectedRecipes: {
-                    collected: (await this.getUsersInventory(user.id)).length,
-                    collectable: (await this.getAllInventoryItems()).length
-                }
-            }
-            return stats;
-        } catch (error) {
-            return { message: error.message };
-        }
-    }
-
     async getCollection(authHeader: string) {
         try {
-            const user = (await this.tokenService.validateBearerToken(authHeader, this.prisma));
-            const userId = user.id
+            const userId = (await this.tokenService.validateBearerToken(authHeader));
+            const user = await getUserById(userId, this.prisma);
             if (user.is_guest) {
                 throw new HttpException('No No Collection', HttpStatus.UNAUTHORIZED);
             }
@@ -362,9 +338,9 @@ export class AssetsService {
      * @returns A frissített profil adatai.
      * @throws HttpException - Ha hiba történik az adatlekérdezés során.
      */
-    async updateProfile(authHeader: string, profile: ProfileDto) {
+    async updateProfile(authHeader: string, profile: ProfileAssetsDataDto) {
         try {
-            const userId = (await this.tokenService.validateBearerToken(authHeader, this.prisma)).id;
+            const userId = (await this.tokenService.validateBearerToken(authHeader));
 
             // Helper function for updating is_set fields
             const updateIsSet = async (model: any, identifierField: string, identifierValue: number | null) => {
@@ -422,7 +398,7 @@ export class AssetsService {
                     if (item.name.split(" ")[1] == "Axe") {
                         events[0].targets.push("axe")
                     }
-                    const achievements = await this.achievementManager.achievementEventListener(userId, events);
+                    const achievements = await this.achievementsService.achievementEventListener(userId, events);
                     if (achievements) {
                         this.achievementsGateway.emitAchievements(clientId, achievements);
                     }

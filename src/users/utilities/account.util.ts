@@ -1,11 +1,18 @@
+import { getCurrentDate } from 'src/sharedComponents/utilities/date.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IUser } from '../interfaces/user.interface';
-import { createToken } from '../../shared/utilities/tokenCreation';
 import * as bcrypt from 'bcrypt';
-import { getCurrentDate } from 'src/shared/utilities/CurrentDate';
+import { TokenService } from 'src/token/token.service';
+import { Injectable } from '@nestjs/common';
 
-export class AccountUtil {
-    static async createAccount(
+Injectable()
+export class AccountUtilities {
+
+    constructor(
+        private readonly tokenService: TokenService
+    ) {}
+
+    async createAccount(
         prisma: PrismaService,
         accountData?: { username?: string; email?: string; password?: string; stayLoggedIn?: boolean }
     ): Promise<IUser> {
@@ -57,7 +64,7 @@ export class AccountUtil {
             // Törzsadatok generálása
             return {
                 id: createdUser.id,
-                loginToken: await createToken(prisma),
+                loginToken: await this.tokenService.createToken(),
                 username: isGuest ? `Guest${createdUser.id}` : createdUser.username,
                 profilePicture: {
                     id: 15,

@@ -1,42 +1,17 @@
-// *** NestJS könyvtárak ***
-import { Injectable, HttpException, HttpStatus, Scope } from '@nestjs/common';
-
-// *** Shared modulok ***
-import { createToken } from 'src/shared/utilities/tokenCreation';
-
-// *** Prisma ***
-import { PrismaService } from 'src/prisma/prisma.service';
-
-// *** DTO-k ***
-import { LoginDataDto } from './dtos/login.dto';
-import { RegistDataDto } from './dtos/regist.dto';
-import { UpdateSettingsDto } from './dtos/settingsData.dto';
-
-// *** Interfészek és osztályok ***
-import { IUser, IUserData } from './interfaces/user.interface';
-import { ISettings } from '../settings/interfaces/ISettings';
-import { User } from './models/user.class';
-
-// *** Utility funkciók ***
-import { createAccount } from './utilities/AccountCreation';
-import { pairTokenWithUser } from './utilities/TokenPairingWithUser';
-import { deleteToken } from '../shared/utilities/tokenDeletion';
-import userAuthorization, { findUser } from './utilities/userAuthorization.util';
-import { createDefaultSettings } from './utilities/DefaultSettingsCreation';
-import { modifySettings } from './utilities/SettingsModification';
-import { geatherSettings } from './utilities/SettingsCollection';
-import { AssetsService } from 'src/assets/assets.service';
-import { ProfileDto } from './dtos/profileAssets.dto';
-import { GameService } from 'src/game/game.service';
-import { RandomizePasswordResetImages } from './utilities/RandomizePasswordResetImages';
-import { getCurrentDate } from 'src/shared/utilities/CurrentDate';
-import { v4 as uuidv4 } from 'uuid';
-import { EmailService } from 'src/email/email.service';
-import { AchievementManager } from 'src/achievements/AchievementManager';
-import { AchievementsGateway } from 'src/achievements/achievements.gateway';
-import * as bcrypt from 'bcrypt';
-import { IItem } from 'src/game/interfaces/IItem';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { TokenService } from 'src/token/token.service';
+import { User } from './classes/user.class';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { AssetsService } from 'src/assets/assets.service';
+import { IUser, IUserData } from './interfaces/user.interface';
+import { RegistDataDto } from './dtos/regist.dto';
+import { AccountUtilities } from './utilities/account.util';
+import { SettingsService } from 'src/settings/settings.service';
+import { LoginDataDto } from './dtos/login.dto';
+import * as bcrypt from 'bcrypt';
+import { getCurrentDate } from 'src/sharedComponents/utilities/date.util';
+import { v4 as uuidv4 } from 'uuid';
+import { getStreak, getUserById } from './utilities/user.util';
 
 
 @Injectable()
@@ -48,16 +23,14 @@ export class UsersService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly assetsService: AssetsService,
-        private readonly gameService: GameService,
-        private readonly emailService: EmailService,
-        private readonly achievementManager: AchievementManager,
-        private readonly achievementsGateway: AchievementsGateway,
         private readonly tokenService: TokenService,
+        private readonly settingsService: SettingsService,
+        private readonly accountUtilities: AccountUtilities,
     ) { }
 
     private async createNewUser(newUser: IUser, isExpire: boolean) {
         try {
-            await pairTokenWithUser(this.prisma, newUser.id, newUser.loginToken, isExpire);
+            await this.tokenService.pairTokenWithUser(newUser.id, newUser.loginToken, isExpire);
             UsersService.tokenToUser.set(newUser.loginToken, new User(newUser.id, newUser.username, newUser.isGuest, newUser.loginToken));
             //console.log("MAP TARTALMA (createNewUser): ", UsersService.tokenToUser);
         } catch (error) {
@@ -140,9 +113,9 @@ export class UsersService {
             }
         }
 
-        const newUser = await createAccount(this.prisma, { username, email, password, stayLoggedIn });
+        const newUser = await this.accountUtilities.createAccount(this.prisma, { username, email, password, stayLoggedIn });
         await this.createNewUser(newUser, !stayLoggedIn);
-        await createDefaultSettings(this.prisma, newUser.id);
+        await this.settingsService.createDefaultSettings(newUser.id);
 
         const { id, ...userData } = newUser;
         return userData as IUserData;
@@ -153,7 +126,7 @@ export class UsersService {
      * @returns {Promise<IUserData>} A guest account adatai azonosító nélkül.
      */
     async loginWithGuestAccount(): Promise<IUserData> {
-        const newGuest = await createAccount(this.prisma);
+        const newGuest = await this.accountUtilities.createAccount(this.prisma);
 
         // Token párosítása a felhasználóhoz, átmeneti státusszal
         //console.log(newGuest)
@@ -172,7 +145,7 @@ export class UsersService {
      */
     async loginUser(authorization: string, userData: LoginDataDto) {
         // Próbálkozás token alapú bejelentkezéssel
-        const user = await this.tokenService.validateBearerToken(authorization, this.prisma, true);
+        const user = await this.tokenService.validateBearerToken(authorization, true);
         if (user) { // Token sikeres validációja
             const formatedUser = await this.generateLoginResponse(user, authorization.replace('Bearer ', ''), true);
             await this.createNewUser(formatedUser, false)
@@ -200,7 +173,7 @@ export class UsersService {
      */
     private async handleBodyLogin(userData: LoginDataDto) {
         // Felhasználó keresése felhasználónév vagy email alapján
-        const user = await userAuthorization.findUserByName(this.prisma, {
+        const user = await this.findUserByName({
             username: userData.usernameOrEmail,
             email: userData.usernameOrEmail,
         });
@@ -210,14 +183,14 @@ export class UsersService {
         }
 
         // Jelszó ellenőrzése
-        const isPasswordValid = await userAuthorization.validatePassword(userData.password, user.password);
+        const isPasswordValid = await this.validatePassword(userData.password, user.password);
         if (!isPasswordValid) {
             return { errors: { username: ["Password is not correct!"] } };
         }
 
         // Token generálása és párosítása
-        const newToken = await createToken(this.prisma);
-        await pairTokenWithUser(this.prisma, user.id, newToken, !userData.stayLoggedIn);
+        const newToken = await this.tokenService.createToken();
+        await this.tokenService.pairTokenWithUser(user.id, newToken, !userData.stayLoggedIn);
 
         // Válasz generálása, objektum generálása
         const formatedUser = await this.generateLoginResponse(user, newToken, userData.stayLoggedIn);
@@ -236,30 +209,18 @@ export class UsersService {
     async logoutUser(authHeader: string) {
         try {
             // Felhasználó validálása Basic tokennel
-            const user = await this.tokenService.validateBasicToken(authHeader, this.prisma);
+            const user = await this.tokenService.validateBasicToken(authHeader);
 
             // Token törlése az adatbázisból
-            const isDeleted = await deleteToken(this.prisma, user.id);
+            const isDeleted = await this.tokenService.deleteToken(user);
             if (!isDeleted) {
                 throw new Error('A token törlése nem sikerült.');
             }
 
-            console.log(`Token törölve: Felhasználó ID = ${user.id}`);
+            console.log(`Token törölve: Felhasználó ID = ${user}`);
         } catch (error) {
             console.error('LogoutUser error:', error.message);
             throw new HttpException(error.message || 'Szerverhiba történt.', HttpStatus.UNAUTHORIZED);
-        }
-    }
-
-    async getUserById(userId: number) {
-        try {
-            const user = await this.prisma.users.findUnique({ where: { id: userId } });
-            if (!user) {
-                throw new HttpException(`User with ID ${userId} not found.`, HttpStatus.NOT_FOUND);
-            }
-            return user;
-        } catch (error) {
-            throw new HttpException("Failed to retrieve user data.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -313,7 +274,7 @@ export class UsersService {
         try {
             const token = authHeader.replace('Bearer ', '');
             const verifyToken = uuidv4()
-            const images = await RandomizePasswordResetImages(this.prisma);
+            const images = await this.RandomizePasswordResetImages();
             if (await this.findEmail(email)) {
                 const paswordReset = {
                     token: verifyToken,
@@ -338,13 +299,13 @@ export class UsersService {
         }
     }
 
-    async RandomizePasswordResetImages(){
+    async RandomizePasswordResetImages() {
         const images = await this.prisma.collections.findMany();
         const randomImagesSrc = new Set()
         const randomIndexes = [];
         while (randomImagesSrc.size < 3) {
             const randomIndex = Math.floor(Math.random() * images.length);
-            if(!randomImagesSrc.has(images[randomIndex].src)){
+            if (!randomImagesSrc.has(images[randomIndex].src)) {
                 randomImagesSrc.add(images[randomIndex].src);
                 randomIndexes.push(randomIndex);
             };
@@ -447,5 +408,98 @@ export class UsersService {
         } catch (error) {
             return { message: error.message };
         }
+    }
+
+    //######################################################### USER STATISTICS FUNCTIONS #########################################################
+
+    /**
+         * Lekéri a felhasználó statisztikáit.
+         * @param authHeader - Az autorizációs fejléc, amely tartalmazza a Bearer tokent.
+         * @returns A felhasználó statisztikái.
+         * @throws HttpException - Ha hiba történik az adatlekérdezés során.
+         */
+    async getStats(authHeader: string) {
+        try {
+            const userId = (await this.tokenService.validateBearerToken(authHeader));
+            const user = await getUserById(userId, this.prisma);
+            const stats = {
+                username: user.username,
+                profilePicture: (await this.assetsService.getUsersProfilePicture(user.id)).find(picture => picture.is_set).profile_pictures,
+                profileBorder: (await this.assetsService.getUsersProfileBorders(user.id)).find(border => border.is_set).profile_borders,
+                streak: await getStreak(user.id),
+                gamemodes: await this.sortGames(user.id),
+                registrationDate: user.registration_date.toLocaleDateString(),
+                performedAchievements: {
+                    collected: (await this.assetsService.getUsersAchievements(user.id)).filter(achievement => achievement.progress === achievement.achievements.goal).length,
+                    collectable: (await this.assetsService.getAllAchievements()).length
+                },
+                collectedRecipes: {
+                    collected: (await this.assetsService.getUsersInventory(user.id)).length,
+                    collectable: (await this.assetsService.getAllInventoryItems()).length
+                }
+            }
+            return stats;
+        } catch (error) {
+            return { message: error.message };
+        }
+    }
+
+    async getUsersGames(userId: number) {
+        return await this.prisma.games.findMany({
+            select: {
+                date: true,
+                is_solved: true,
+                gamemodes: {
+                    select: {
+                        id: true,
+                        name: true,
+                        difficulties: {
+                            select: {
+                                id: true,
+                                color_code: true
+                            }
+                        }
+                    }
+                },
+                _count: {
+                    select: {
+                        tips: true
+                    }
+                }
+            },
+            where: {
+                player: userId
+            }
+        });
+    }
+
+    async sortGames(userId: number) {
+        const games = {};
+        const userGames = await this.getUsersGames(userId);
+        userGames.forEach(game => {
+            if (games[game.gamemodes.id]) {
+                games[game.gamemodes.id].played++;
+                if (game.is_solved) {
+                    games[game.gamemodes.id].solved++;
+                    if (game._count.tips > 0) {
+                        if (
+                            games[game.gamemodes.id].fastestSolve === null ||
+                            game._count.tips < games[game.gamemodes.id].fastestSolve
+                        ) {
+                            games[game.gamemodes.id].fastestSolve = game._count.tips;
+                        }
+                    }
+                }
+            } else {
+                games[game.gamemodes.id] = {
+                    gamemodeName: game.gamemodes.name,
+                    played: 1,
+                    solved: game.is_solved ? 1 : 0,
+                    fastestSolve: game.is_solved && game._count.tips > 0 ? game._count.tips : null,
+                    color: game.gamemodes.difficulties.color_code
+                };
+            }
+        });
+        return Object.keys(games).sort().map(key => games[key]);
     }
 }

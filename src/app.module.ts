@@ -6,7 +6,6 @@ import { SocketModule } from './socket/socket.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { GameModule } from './game/game.module';
 import { RiddlesModule } from './riddles/riddles.module';
-import { TipsModule } from './tips/tips.module';
 import { RecipesModule } from './recipes/recipes.module';
 import { TokenModule } from './token/token.module';
 import { EmailModule } from './email/email.module';
@@ -15,9 +14,10 @@ import { AssetsModule } from './assets/assets.module';
 import { AdminModule } from './admin/admin.module';
 import { AchievementsModule } from './achievements/achievements.module';
 import { SettingsModule } from './settings/settings.module';
+import { TipModule } from './tip/tip.module';
 
 @Module({
-  imports: [UsersModule, SocketModule, PrismaModule, GameModule, RiddlesModule, TipsModule, RecipesModule, TokenModule, EmailModule, CacheModule, AssetsModule, AdminModule, AchievementsModule, SettingsModule],
+  imports: [UsersModule, SocketModule, PrismaModule, GameModule, RiddlesModule, RecipesModule, TokenModule, EmailModule, CacheModule, AssetsModule, AdminModule, AchievementsModule, SettingsModule, TipModule],
   controllers: [AppController],
   providers: [AppService],
 })

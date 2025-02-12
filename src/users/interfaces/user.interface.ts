@@ -1,10 +1,10 @@
-import { IAccessory } from "../../assets/interfaces/IAsset.interface";
+import { IAsset } from "src/assets/interfaces/assets.interface";
 
 export interface IUserData{
     loginToken: string;
     username: string;
-    profilePicture: IAccessory;
-    profileBorder: IAccessory;
+    profilePicture: IAsset;
+    profileBorder: IAsset;
     stayLoggedIn: boolean;
     isGuest: boolean
 }

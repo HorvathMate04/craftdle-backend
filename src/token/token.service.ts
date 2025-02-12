@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException, HttpException, HttpStatus } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as dotenv from 'dotenv';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config();
@@ -11,22 +11,25 @@ export class TokenService {
 
     private readonly ENCRYPTION_KEY: Buffer;
 
-    constructor() {
+    constructor(
+        private readonly prisma: PrismaService
+    ) {
         // Az ENCRYPTION_KEY csak egyszer, a konstruktorban kerül betöltésre
         this.ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY!, 'hex');
     }
 
+    //######################################################### TOKEN CRUD FUNCTIONS #########################################################
+
     /**
      * Token létrehozása, biztosítva, hogy egyedi legyen az adatbázisban.
      * Ha a generált token már létezik, újratér.
-     * @param prisma - A Prisma szolgáltatás példánya.
      * @returns Új generált token.
      */
-    async createToken(prisma: PrismaService): Promise<string> {
+    async createToken(): Promise<string> {
         let token: string = uuidv4();
 
         // Ellenőrizzük, hogy a generált token már létezik-e az adatbázisban
-        while (await this.validateToken(token, prisma, true)) {
+        while (await this.validateToken(token, true)) {
             // Ha létezik, újat generálunk
             token = uuidv4();
         }
@@ -38,14 +41,13 @@ export class TokenService {
     /**
      * Token törlése az adatbázisból egy adott felhasználóhoz.
      * Ez a függvény csak a tokent törli, a felhasználói adatok érintetlenek maradnak.
-     * @param prisma - A Prisma szolgáltatás példánya.
      * @param userId - A felhasználó azonosítója, akinek a tokene törlésre kerül.
      * @returns Boolean érték, amely jelzi, hogy sikeres volt-e a törlés.
      */
-    async deleteToken(prisma: PrismaService, userId: number): Promise<boolean> {
+    async deleteToken(userId: number): Promise<boolean> {
         try {
-            const deletedToken = await prisma.tokens.delete({
-                where: { userId: userId },
+            const deletedToken = await this.prisma.tokens.delete({
+                where: { user: userId },
             });
 
             return !!deletedToken; // Sikeres törlés esetén `true`
@@ -55,16 +57,69 @@ export class TokenService {
         }
     }
 
+        /**
+     * Tokens lekérése felhasználói ID alapján.
+     * @param userId - A felhasználó azonosítója.
+     * @returns A felhasználóhoz tartozó összes token.
+     * @throws HttpException - Ha a lekérés nem sikerült.
+     */
+        async getTokensByUserId(userId: number) {
+            try {
+                return await this.prisma.tokens.findMany({ where: { user: userId } });
+            } catch (error) {
+                throw new HttpException('Tokenek lekérése sikertelen.', HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        }
+
+        /**
+     * Token párosítása a megadott felhasználóhoz az adatbázisban.
+     * Biztosítja, hogy egy felhasználónak csak egy tokenje lehet.
+     * @param userId - A felhasználó azonosítója, akihez a tokent párosítani kell.
+     * @param token - A generált belépési token.
+     * @param isExpire - Megadja, hogy a token átmeneti vagy állandó.
+     */
+    async pairTokenWithUser(
+        userId: number,
+        token: string,
+        isExpire: boolean
+    ): Promise<void> {
+        try {
+            // Ellenőrizzük, hogy van-e már meglévő token a felhasználónál
+            const existingToken = await this.prisma.tokens.findFirst({
+                where: { user: userId },
+            });
+
+            if (existingToken) { // Ha van már tokenje, töröljük a tokent az adatbázisból
+                await this.prisma.tokens.delete({
+                    where: { user: userId },
+                });
+            }
+
+            // Új token párosítása a felhasználóhoz
+            await this.prisma.tokens.create({
+                data: {
+                    user: userId,
+                    login_token: this.encryptUuid(token),
+                    is_expire: isExpire,
+                },
+            });
+        } catch (error) {
+            console.error('Token párosítása nem sikerült:', error);
+            throw new Error('Adatbázis hiba: Token párosítása nem sikerült.');
+        }
+    }
+
+    //######################################################### TOKEN VALIDATION FUNCTIONS #########################################################
+
     /**
      * Alap (Basic Auth) token validálása.
      * A token a következő formátumban érkezik: `Basic <base64(username:token)>`.
      * A függvény a `username` és a hozzá tartozó `token` alapján azonosítja a felhasználót.
      * @param authorization - Az `authorization` fejléc tartalma (Basic token).
-     * @param prisma - A Prisma szolgáltatás példánya.
      * @returns Az érvényes tokenhez tartozó felhasználó adatai.
      * @throws UnauthorizedException, ha a token érvénytelen vagy hiányzik.
      */
-    async validateBasicToken(authorization: string, prisma: PrismaService) {
+    async validateBasicToken(authorization: string) {
         if (!authorization || !authorization.startsWith('Basic ')) {
             throw new UnauthorizedException('Az Authorization fejléc hiányzik vagy érvénytelen.');
         }
@@ -79,7 +134,7 @@ export class TokenService {
         }
 
         // Token validálása
-        const user = await this.validateToken(token, prisma);
+        const user = await this.validateToken(token);
         if (!user) {
             throw new HttpException('Érvénytelen token.', HttpStatus.UNAUTHORIZED);
         }
@@ -90,11 +145,10 @@ export class TokenService {
     /**
      * Bearer token validálása.
      * @param authorization - Az `authorization` header tartalma.
-     * @param prisma - A Prisma szolgáltatás példánya.
      * @param forUserLogin - Flag, amely jelzi, hogy bejelentkezéskor fut-e.
      * @returns Az érvényes tokenhez tartozó felhasználó adatai vagy `null` a bejelentkezésnél.
      */
-    async validateBearerToken(authorization: string, prisma: PrismaService, forUserLogin: boolean = false) {
+    async validateBearerToken(authorization: string, forUserLogin: boolean = false) {
         if (!authorization) {
             if (forUserLogin) {
                 return null; // Ha a bejelentkezési folyamat része, nem dob hibát
@@ -107,7 +161,7 @@ export class TokenService {
             throw new UnauthorizedException('Token hiányzik.');
         }
 
-        const user = await this.validateToken(token, prisma);
+        const user = await this.validateToken(token);
         if (!user) {
             throw new HttpException('Érvénytelen token.', HttpStatus.UNAUTHORIZED);
         }
@@ -115,30 +169,14 @@ export class TokenService {
     }
 
     /**
-     * Tokens lekérése felhasználói ID alapján.
-     * @param userId - A felhasználó azonosítója.
-     * @param prisma - A Prisma szolgáltatás példánya.
-     * @returns A felhasználóhoz tartozó összes token.
-     * @throws HttpException - Ha a lekérés nem sikerült.
-     */
-    async getTokensByUserId(userId: number, prisma: PrismaService) {
-        try {
-            return await prisma.tokens.findMany({ where: { userId: userId } });
-        } catch (error) {
-            throw new HttpException('Tokenek lekérése sikertelen.', HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    /**
      * Token validálása az adatbázisban.
      * @param token - A validálandó token.
-     * @param prisma - A Prisma szolgáltatás példánya.
      * @param forUuidGeneration - Ha igaz, akkor nem dobunk hibát, ha nem található token.
      * @returns A felhasználó, akihez a token tartozik, vagy `null` ha érvénytelen.
      * @throws UnauthorizedException - Ha a token nem található.
      */
-    async validateToken(token: string, prisma: PrismaService, forUuidGeneration: boolean = false) {
-        const tokenQuery = await prisma.tokens.findFirst({
+    async validateToken(token: string, forUuidGeneration: boolean = false) {
+        const tokenQuery = await this.prisma.tokens.findFirst({
             where: { login_token: this.encryptUuid(token) }
         });
 
@@ -151,6 +189,8 @@ export class TokenService {
 
         return tokenQuery.user;
     }
+
+    //######################################################### TOKEN ENCRYPT&DECODE FUNCTIONS #########################################################
 
     /**
      * IV (Initialization Vector) lekérése UUID-ból AES titkosításhoz.
@@ -186,45 +226,5 @@ export class TokenService {
         let decrypted = decipher.update(encryptedUuid, 'hex', 'utf8');
         decrypted += decipher.final('utf8');
         return decrypted;
-    }
-
-    /**
-     * Token párosítása a megadott felhasználóhoz az adatbázisban.
-     * Biztosítja, hogy egy felhasználónak csak egy tokenje lehet.
-     * @param prisma - A Prisma szolgáltatás példánya.
-     * @param userId - A felhasználó azonosítója, akihez a tokent párosítani kell.
-     * @param token - A generált belépési token.
-     * @param isExpire - Megadja, hogy a token átmeneti vagy állandó.
-     */
-    async pairTokenWithUser(
-        prisma: PrismaService,
-        userId: number,
-        token: string,
-        isExpire: boolean
-    ): Promise<void> {
-        try {
-            // Ellenőrizzük, hogy van-e már meglévő token a felhasználónál
-            const existingToken = await prisma.tokens.findFirst({
-                where: { userId: userId },
-            });
-
-            if (existingToken) { // Ha van már tokenje, töröljük a tokent az adatbázisból
-                await prisma.tokens.delete({
-                    where: { userId: userId },
-                });
-            }
-
-            // Új token párosítása a felhasználóhoz
-            await prisma.tokens.create({
-                data: {
-                    userId: userId,
-                    login_token: this.encryptUuid(token),
-                    is_expire: isExpire,
-                },
-            });
-        } catch (error) {
-            console.error('Token párosítása nem sikerült:', error);
-            throw new Error('Adatbázis hiba: Token párosítása nem sikerült.');
-        }
     }
 }

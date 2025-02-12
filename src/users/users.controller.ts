@@ -1,14 +1,14 @@
 import { Controller, Get, Post, Put, Delete, Body, UnauthorizedException, Param, Headers, HttpException, HttpStatus, Render, Query } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { ApiResponse } from '../shared/interfaces/APIResponse';
 import { LoginDataDto } from './dtos/login.dto';
 import { RegistDataDto } from './dtos/regist.dto';
-import { UpdateSettingsDto } from './dtos/settingsData.dto';
-import { ProfileDto } from './dtos/profileAssets.dto';
 import { EmailService } from 'src/email/email.service';
 import { EmailGateway } from 'src/email/email.gateway';
 import { SettingsService } from 'src/settings/settings.service';
 import { AssetsService } from 'src/assets/assets.service';
+import { ApiResponse } from 'src/sharedComponents/interfaces/response.interface';
+import { UpdateSettingsDto } from 'src/settings/dtos/settings.dto';
+import { ProfileAssetsDataDto } from 'src/assets/dtos/profileAssets.dto';
 
 @Controller('users')
 export class UsersController {
@@ -154,7 +154,7 @@ export class UsersController {
      * @returns A frissített profil adatai.
      */
     @Put('profile')
-    async updateProfile(@Headers('authorization') authorization: string, @Body() body: ProfileDto): Promise<ApiResponse> {
+    async updateProfile(@Headers('authorization') authorization: string, @Body() body: ProfileAssetsDataDto): Promise<ApiResponse> {
         try {
             const result = await this.assetsService.updateProfile(authorization, body);
             return { data: result };
@@ -171,7 +171,7 @@ export class UsersController {
     @Get('stats')
     async getStats(@Headers('authorization') authorization: string): Promise<ApiResponse> {
         try {
-            const result = await this.assetsService.getStats(authorization)
+            const result = await this.usersService.getStats(authorization)
             return { data: result }
         } catch (err) {
             return { message: err.message }

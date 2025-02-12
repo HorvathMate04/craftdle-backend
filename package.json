@@ -22,16 +22,22 @@
   "dependencies": {
     "@nestjs/common": "^10.0.0",
     "@nestjs/core": "^10.0.0",
+    "@nestjs/mapped-types": "^2.1.0",
     "@nestjs/platform-express": "^10.0.0",
     "@prisma/client": "^6.3.1",
+    "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dotenv": "^16.4.7",
+    "mapped-types": "^0.0.1",
+    "node-cache": "^5.1.2",
+    "nodemailer": "^6.10.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.1",
     "uuid": "^11.0.5",
-    "websocket": "^1.0.35"
+    "websocket": "^1.0.35",
+    "websockets": "^0.2.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
@@ -40,6 +46,7 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.2",
     "@types/node": "^20.3.1",
+    "@types/socket.io": "^3.0.2",
     "@types/supertest": "^6.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",

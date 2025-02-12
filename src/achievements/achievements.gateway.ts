@@ -1,9 +1,17 @@
-import { SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
+import { WebSocketGateway } from '@nestjs/websockets';
+import { Server } from 'socket.io';
+import { IAchievement } from './interfaces/achievement.interface';
 
-@WebSocketGateway()
+@WebSocketGateway({ cors: true })
 export class AchievementsGateway {
-  @SubscribeMessage('message')
-  handleMessage(client: any, payload: any): string {
-    return 'Hello world!';
+
+  private server: Server;
+
+  afterInit(server: Server) {
+    this.server = server;
+  }
+
+  emitAchievements(userId: string, achievements: IAchievement[]) {
+    this.server.to(userId)?.emit("achievements", achievements);
   }
 }

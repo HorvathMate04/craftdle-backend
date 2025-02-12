@@ -1,24 +1,11 @@
-import {
-  SubscribeMessage,
-  WebSocketGateway,
-  OnGatewayInit,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-} from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
-import { Socket, Server } from 'socket.io';
-import { UsersService } from 'src/users/users.service';
-import { Game } from 'src/game/classes/Game';
-import { Riddle } from 'src/game/classes/Riddle';
-import { CacheService } from 'src/cache/cache.service';
-import { RecipeFunctions } from 'src/game/utilities/RecipeFunctions';
-import { createMatrixFromArray } from 'src/shared/utilities/arrayFunctions';
-import { ITip } from 'src/game/interfaces/ITip';
-import { GameService } from 'src/game/game.service';
-import { Maintenance } from 'src/admin/classes/Maintenance';
-import { AchievementManager } from 'src/achievements/AchievementManager';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { AchievementsGateway } from 'src/achievements/achievements.gateway';
+import { AchievementsService } from 'src/achievements/achievements.service';
+import { Maintenance } from 'src/admin/classes/Maintenance';
+import { Game } from 'src/game/classes/game.class';
+import { UsersService } from 'src/users/users.service';
+import { Server, Socket } from 'socket.io';
+import { WebSocketGateway, OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage } from '@nestjs/websockets';
+import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({ cors: true })
 export class SocketGateway
@@ -28,12 +15,12 @@ export class SocketGateway
   private server: Server;
   private reporter: NodeJS.Timeout | null = null;
 
-  private static gameToClient: Map<string, Game> = new Map();
+  static gameToClient: Map<string, Game> = new Map();
 
   constructor(
     private readonly usersService: UsersService,
     private readonly maintenanceService: Maintenance,
-    private readonly achievementManager: AchievementManager,
+    private readonly achievementsService: AchievementsService,
     private readonly achievementGateway: AchievementsGateway,
   ) { }
 
@@ -43,9 +30,9 @@ export class SocketGateway
   }
 
   /**
- * Eltávolítja a gamet a socket ID alapján.
- * @param socketId - A socket ID.
- */
+   * Eltávolítja a gamet a socket ID alapján.
+   * @param socketId - A socket ID.
+   */
   removeUserBySocketId(socketId: string): void {
     const game = SocketGateway.gameToClient.get(socketId);
     if (game) {
@@ -75,7 +62,7 @@ export class SocketGateway
     // Socket ID társítása a UsersService-ben
     this.usersService.associateSocketId(token, client.id);
     if (!user.isGuest) {
-      const achievements = await this.achievementManager.achievementEventListener(user.id, [{ name: "regist", targets: ["regist"] }]);
+      const achievements = await this.achievementsService.achievementEventListener(user.id, [{ name: "regist", targets: ["regist"] }]);
       this.achievementGateway.emitAchievements(client.id, achievements)
     }
     this.logger.log(`Client connected: ${client.id} (User: ${user.username})`);
@@ -110,7 +97,7 @@ export class SocketGateway
   @SubscribeMessage('credits')
   async handleCredits(client: Socket) {
     const user = this.usersService.getUserBySocketId(client.id);
-    const achievements = await this.achievementManager.achievementEventListener(user.id, [{ name: "credits", targets: ["watched"] }])
+    const achievements = await this.achievementsService.achievementEventListener(user.id, [{ name: "credits", targets: ["watched"] }])
     this.achievementGateway.emitAchievements(client.id, achievements)
   }
 

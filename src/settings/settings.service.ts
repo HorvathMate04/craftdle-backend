@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ISettings } from './interfaces/ISettings.interface';
-import { UpdateSettingsDto } from './dtos/settingsData.dto';
+import { ISettings } from './interfaces/settings.interface';
+import { UpdateSettingsDto } from './dtos/settings.dto';
 import { TokenService } from 'src/token/token.service';
 
 @Injectable()
@@ -23,7 +23,7 @@ export class SettingsService {
     async collectSettings(authHeader: string): Promise<ISettings[]> {
         try {
             // Felhasználó azonosítása Bearer token alapján
-            const userId = (await this.tokenService.validateBearerToken(authHeader, this.prisma)).id;
+            const userId = (await this.tokenService.validateBearerToken(authHeader));
 
             // Beállítások lekérdezése
             return this.gatherSettings(userId);
@@ -182,7 +182,7 @@ export class SettingsService {
      * @throws {NotFoundException} - Ha a beállítások nem találhatók.
      */
     async modifySettings(settingsId: number, authHeader: string, settingsData: UpdateSettingsDto) {
-        const userId = (await this.tokenService.validateBearerToken(authHeader, this.prisma)).id;
+        const userId = (await this.tokenService.validateBearerToken(authHeader));
 
         const settings = this.getSettings(settingsId, userId);
 
